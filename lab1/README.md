@@ -17,10 +17,10 @@
 
 ## Инструкция пользователя
 
-insmod main.ko - загрузка модуля
-rmmod main.ko - выгрузка модуля
+- insmod main.ko - загрузка модуля
+- rmmod main.ko - выгрузка модуля
 
 ## Примеры использования
 
-echo " some chars   " > /dev/var4
-cat /proc/var4
+- echo " some chars   " > /dev/var4
+- cat /proc/var4
