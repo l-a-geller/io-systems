@@ -52,6 +52,7 @@ static ssize_t my_dev_write(struct file *f, const char __user *buf,  size_t len,
         size_t *spaces_stat_new;
         size_t count_spaces;
 
+        pr_info("Driver: write()\n");
         count_spaces = 0;
 
         dev_read_buffer = kmalloc(sizeof(char)*len, GFP_KERNEL);
@@ -62,9 +63,8 @@ static ssize_t my_dev_write(struct file *f, const char __user *buf,  size_t len,
                 return -EFAULT;
 
         for (i=0; i<len; ++i) {
-                if (dev_read_buffer[i] == ' ') {
+                if (dev_read_buffer[i] == ' ')
                         count_spaces++;
-                }
         }
         kfree(dev_read_buffer);
 
@@ -73,7 +73,7 @@ static ssize_t my_dev_write(struct file *f, const char __user *buf,  size_t len,
                 capacity *= 2;
                 spaces_stat_new = kmalloc(sizeof(size_t)*capacity, GFP_KERNEL);
                 if (!spaces_stat_new) {
-                        pr_alert("Failed to initialize statistics array\n");
+                        pr_alert("Failed to reinitialize statistics array\n");
                         return len;
                 }
                 memmove(spaces_stat_new, spaces_stat, (capacity/2)*sizeof(size_t));
@@ -83,7 +83,6 @@ static ssize_t my_dev_write(struct file *f, const char __user *buf,  size_t len,
         spaces_stat[position] = count_spaces;
         position++;
 
-        pr_info("Spaces: %ld\n", count_spaces);
         return len;
 }
 
@@ -112,11 +111,16 @@ static ssize_t my_proc_read(struct file *file_ptr, char __user *ubuffer, size_t 
         if (*offset > 0)
                 return 0;
 
-        out_buf = kmalloc(3*position*sizeof(char), GFP_KERNEL);
+        out_buf = kmalloc(4*position*sizeof(char), GFP_KERNEL);
+        if (!out_buf) {
+                pr_alert("Failed to allocate buffer message\n");
+                return -ENOMEM;
+        }
+
         out_p = out_buf;
         for (i=0; i<position; i++) {
-                size_t myInteger = spaces_stat[i];
-                out_p += sprintf(out_p, "%ld\n", myInteger);
+                size_t next = spaces_stat[i];
+                out_p += sprintf(out_p, "%ld\n", next);
         }
 
         if (copy_to_user(ubuffer, out_buf, out_p - out_buf)) {
@@ -124,7 +128,7 @@ static ssize_t my_proc_read(struct file *file_ptr, char __user *ubuffer, size_t 
                 return -EFAULT;
         }
         *offset += out_p - out_buf;
-        kfree(out_p);
+        kfree(out_buf);
         return *offset;
 }
 
