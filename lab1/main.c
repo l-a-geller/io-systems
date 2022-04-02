@@ -114,6 +114,7 @@ static ssize_t my_proc_read(struct file *file_ptr, char __user *ubuffer, size_t 
         out_buf = kmalloc(4*position*sizeof(char), GFP_KERNEL);
         if (!out_buf) {
                 pr_alert("Failed to allocate buffer message\n");
+                kfree(out_buf);
                 return -ENOMEM;
         }
 
@@ -125,6 +126,7 @@ static ssize_t my_proc_read(struct file *file_ptr, char __user *ubuffer, size_t 
 
         if (copy_to_user(ubuffer, out_buf, out_p - out_buf)) {
                 pr_alert("Failed to copy buffer message\n");
+                kfree(out_buf);
                 return -EFAULT;
         }
         *offset += out_p - out_buf;
