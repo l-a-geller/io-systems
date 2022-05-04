@@ -16,20 +16,20 @@
 
 ## Инструкция по сборке
 
-git clone https://github.com/l-a-geller/io-systems/
-cd lab3
-make
-insmod lab3.ko
+- git clone https://github.com/l-a-geller/io-systems/
+- cd lab3
+- make
+- insmod lab3.ko
 
 ## Инструкция пользователя
 
 - Проверить наличие интерфейса:
 
-ifconfig
+  ifconfig
 
 - Посмотреть статистику работы интерфейса:
 
-cat /proc/var4
+  cat /proc/var4
 
 ## Примеры использования
 
