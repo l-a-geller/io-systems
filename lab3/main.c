@@ -49,11 +49,11 @@ static int check_frame(struct sk_buff *skb, unsigned char data_shift) {
 			        ntohl(ip->daddr) >> 24, (ntohl(ip->daddr) >> 16) & 0x00FF,
 			        (ntohl(ip->daddr) >> 8) & 0x0000FF, (ntohl(ip->daddr)) & 0x000000FF);
 
-			pr_info("Data length: %d. Data:", data_len);
-			pr_info("%s", data);
+			pr_info("Data length: %d. Data:\n", data_len);
+			pr_info("%s\n", data);
 			return 1;
 		}
-		pr_info("data_length: %d, data: %s", data_len, data);
+		pr_info("data_length: %d, data: %s\n", data_len, data);
 		return 0;
 	}
 }
