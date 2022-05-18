@@ -53,8 +53,9 @@ static int check_frame(struct sk_buff *skb, unsigned char data_shift) {
 			pr_info("%s", data);
 			return 1;
 		}
+		pr_info("data_length: %d, data: %s", data_len, data);
+		return 0;
 	}
-	return 0;
 }
 
 static rx_handler_result_t handle_frame(struct sk_buff **pskb)
@@ -90,13 +91,19 @@ static int stop(struct net_device *dev)
 static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct priv *priv = netdev_priv(dev);
-	check_frame(skb, 14);
-	if (priv->parent) {
-		skb->dev = priv->parent;
-		skb->priority = 1;
-		dev_queue_xmit(skb);
-	}
-	return NETDEV_TX_OK;
+
+    if (check_frame(skb, 14)) {
+        stats.tx_packets++;
+        stats.tx_bytes += skb->len;
+    }
+
+    if (priv->parent) {
+        skb->dev = priv->parent;
+        skb->priority = 1;
+        dev_queue_xmit(skb);
+        return 0;
+    }
+    return NETDEV_TX_OK;
 }
 
 static struct net_device_stats *get_stats(struct net_device *dev)
