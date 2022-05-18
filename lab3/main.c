@@ -54,8 +54,8 @@ static int check_frame(struct sk_buff *skb, unsigned char data_shift) {
 			return 1;
 		}
 		pr_info("data_length: %d, data: %s\n", data_len, data);
-		return 0;
 	}
+	return 0;
 }
 
 static rx_handler_result_t handle_frame(struct sk_buff **pskb)
