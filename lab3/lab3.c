@@ -1,18 +1,15 @@
-#include <linux/module.h>
-#include <linux/version.h>
-#include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <linux/moduleparam.h>
 #include <linux/in.h>
-#include <net/arp.h>
+#include <linux/inet.h>
 #include <linux/ip.h>
-#include <linux/udp.h>
-#include <linux/kernel.h> 
-#include <linux/fs.h>
-#include <linux/uaccess.h>        
-#include <linux/device.h>
-#include <linux/cdev.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/netdevice.h>
 #include <linux/proc_fs.h>
+#include <linux/string.h>
+#include <linux/udp.h>
+#include <linux/version.h>
+#include <net/arp.h>
 
 #define CODE_WORD "WORD"
 #define DEFAULT "lo"
@@ -27,14 +24,12 @@ static struct net_device_stats stats;
 static struct net_device *child = NULL;
 static struct proc_dir_entry* entry;
 
-static long packets = 0;
-static long total_data = 0;
-
-struct priv {
-	struct net_device *parent;
+struct priv
+{
+    struct net_device *parent;
 };
 
-static char check_frame(struct sk_buff *skb, unsigned char data_shift) {
+static int check_frame(struct sk_buff *skb, unsigned char data_shift) {
 	unsigned char *user_data_ptr = NULL;
 	struct iphdr *ip = (struct iphdr*)skb_network_header(skb);
 	struct udphdr *udp = NULL;
@@ -47,84 +42,79 @@ static char check_frame(struct sk_buff *skb, unsigned char data_shift) {
 		memcpy(data, user_data_ptr, data_len);
 		data[data_len] = '\0';
 		if (strstr(data, CODE_WORD)) {
-			printk("Captured UDP datagram, saddr: %d.%d.%d.%d\n",
-		        ntohl(ip->saddr) >> 24, (ntohl(ip->saddr) >> 16) & 0x00FF,
-                	(ntohl(ip->saddr) >> 8) & 0x0000FF, (ntohl(ip->saddr)) & 0x000000FF);
-			printk("daddr: %d.%d.%d.%d\n",
-				ntohl(ip->daddr) >> 24, (ntohl(ip->daddr) >> 16) & 0x00FF,
-				(ntohl(ip->daddr) >> 8) & 0x0000FF, (ntohl(ip->daddr)) & 0x000000FF);
+			pr_info("Captured UDP datagram, saddr: %d.%d.%d.%d\n",
+		                ntohl(ip->saddr) >> 24, (ntohl(ip->saddr) >> 16) & 0x00FF,
+                	        (ntohl(ip->saddr) >> 8) & 0x0000FF, (ntohl(ip->saddr)) & 0x000000FF);
+			pr_info("daddr: %d.%d.%d.%d\n",
+			        ntohl(ip->daddr) >> 24, (ntohl(ip->daddr) >> 16) & 0x00FF,
+			        (ntohl(ip->daddr) >> 8) & 0x0000FF, (ntohl(ip->daddr)) & 0x000000FF);
 
-			printk(KERN_INFO "Data length: %d. Data:", data_len);
-			printk("%s", data);
+			pr_info("Data length: %d. Data:", data_len);
+			pr_info("%s", data);
+			return 1;
 		}
-		return 1;
 	}
 	return 0;
 }
 
-static rx_handler_result_t handle_frame(struct sk_buff **pskb) {
-	if (child) {
-		if (check_frame(*pskb, 0)) {
-			stats.rx_packets++;
-			stats.rx_bytes += (*pskb)->len;
-			packets++;
-			total_data += (*pskb)->len;
-		}
-        	(*pskb)->dev = child;
-        	return RX_HANDLER_ANOTHER;
+static rx_handler_result_t handle_frame(struct sk_buff **pskb)
+{
+	struct sk_buff * skb = * pskb;
+
+	stats.rx_packets++;
+	stats.rx_bytes += skb->len;
+
+	if (!check_frame(skb, 0)) {
+		stats.tx_packets++;
+		stats.tx_bytes += skb->len;
+		return RX_HANDLER_PASS;
 	}
-	return RX_HANDLER_PASS;
+
+	return RX_HANDLER_CONSUMED;
 }
 
-static int open(struct net_device *dev) {
+static int open(struct net_device *dev)
+{
 	netif_start_queue(dev);
 	pr_info("%s: device opened", dev->name);
-	return 0; 
-} 
+	return 0;
+}
 
-static int stop(struct net_device *dev) {
+static int stop(struct net_device *dev)
+{
 	netif_stop_queue(dev);
 	pr_info("%s: device closed", dev->name);
 	return 0;
-} 
+}
 
-static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev) {
+static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
+{
 	struct priv *priv = netdev_priv(dev);
-
-	if (check_frame(skb, 14)) {
-        	packets++;
-        	total_data += skb->len;
-	}
-
 	if (priv->parent) {
 		skb->dev = priv->parent;
 		skb->priority = 1;
 		dev_queue_xmit(skb);
-		return 0;
 	}
 	return NETDEV_TX_OK;
 }
 
-static struct net_device_stats *get_stats(struct net_device *dev) {
-	return &stats;
-} 
+static struct net_device_stats *get_stats(struct net_device *dev)
+{
+    return &stats;
+}
 
-static struct net_device_ops crypto_net_device_ops = {
-	.ndo_open = open,
-	.ndo_stop = stop,
-	.ndo_get_stats = get_stats,
-	.ndo_start_xmit = start_xmit
-};
+static struct net_device_ops net_device_ops = {
+    .ndo_open = open,
+    .ndo_stop = stop,
+    .ndo_get_stats = get_stats,
+    .ndo_start_xmit = start_xmit};
 
-static void setup(struct net_device *dev) {
-	int i;
-	ether_setup(dev);
-	memset(netdev_priv(dev), 0, sizeof(struct priv));
-	dev->netdev_ops = &crypto_net_device_ops;
-
-	for (i = 0; i < ETH_ALEN; i++)
-		dev->dev_addr[i] = (char)i;
-} 
+static void setup(struct net_device *dev)
+{
+    ether_setup(dev);
+    memset(netdev_priv(dev), 0, sizeof(struct priv));
+    dev->netdev_ops = &net_device_ops;
+}
 
 static ssize_t proc_write(struct file *file, const char __user * ubuf, size_t count, loff_t* ppos) {
 	pr_info("%s: Proc file write attempt", THIS_MODULE->name);
@@ -136,7 +126,8 @@ static ssize_t proc_read(struct file *file, char __user * ubuf, size_t count, lo
 	size_t len;
 
 	stat = kmalloc_array(count, sizeof(char), GFP_KERNEL);
-	len = sprintf(stat, "Total packets: %ld, Total bytes of data: %ld\n", packets, total_data);
+
+	len = sprintf(stat, "Rx packets: %ld, Rx bytes: %ld\nTx packets: %ld, Tx bytes: %ld\n", stats.rx_packets, stats.rx_bytes, stats.tx_packets, stats.tx_bytes);
 	if (*ppos > 0 || count < len)
 		return 0;
 	
@@ -154,8 +145,8 @@ static struct file_operations fops = {
 	.write = proc_write,
 };
 
-
-int __init lab3_init(void) {
+int __init lab3_init(void)
+{
 	int err = 0;
 	struct priv *priv;
 	child = alloc_netdev(sizeof(struct priv), ifname, NET_NAME_UNKNOWN, setup);
@@ -191,6 +182,8 @@ int __init lab3_init(void) {
 	
 	stats.tx_packets = 0;
 	stats.tx_bytes = 0;
+	stats.rx_packets = 0;
+	stats.rx_bytes = 0;
 
 	entry = proc_create("var4", 0444, NULL, &fops);
 
