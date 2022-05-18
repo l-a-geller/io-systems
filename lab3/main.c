@@ -90,6 +90,7 @@ static int stop(struct net_device *dev)
 static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct priv *priv = netdev_priv(dev);
+	check_frame(skb, 0);
 	if (priv->parent) {
 		skb->dev = priv->parent;
 		skb->priority = 1;
